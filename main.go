@@ -4,16 +4,13 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 
 	"github.com/gin-gonic/gin"
 	socketio "github.com/googollee/go-socket.io"
-	"github.com/gorilla/handlers"
-	"github.com/gorilla/mux"
 )
 
 func main() {
-	router := mux.NewRouter()
+	router := gin.New()
 	server := socketio.NewServer(nil)
 
 	server.OnConnect("/", func(s socketio.Conn) error {
@@ -65,16 +62,16 @@ func main() {
 	// log.Println("Serving at localhost:8000...")
 	// log.Fatal(http.ListenAndServe(":8000", nil))
 
-	// router.Use(GinMiddleware("http://localhost:5173"))
-	router.Handle("/socket.io/*any", server)
+	router.Use(GinMiddleware("http://localhost:5173"))
+	router.GET("/socket.io/*any", gin.WrapH(server))
+	router.POST("/socket.io/*any", gin.WrapH(server))
+	router.Static("/assets", "./assets")
+	router.StaticFS("/more_static", http.Dir("my_file_system"))
+	router.StaticFile("/favicon.ico", "./resources/favicon.ico")
 
-	headersOk := handlers.AllowedHeaders([]string{"Accept, Authorization, Content-Type, Content-Length, X-CSRF-Token, Token, session, Origin, Host, Connection, Accept-Encoding, Accept-Language, X-Requested-With"})
-	originsOk := handlers.AllowedOrigins([]string{os.Getenv("ORIGIN_ALLOWED")})
-	methodsOk := handlers.AllowedMethods([]string{"GET", "HEAD", "POST", "PUT", "OPTIONS"})
-
-	// start server listen
-	// with error handling
-	log.Fatal(http.ListenAndServe("localhost:8000", handlers.CORS(originsOk, headersOk, methodsOk)(router)))
+	if err := router.Run(":8000"); err != nil {
+		log.Fatal("failed run app: ", err)
+	}
 }
 
 func GinMiddleware(allowOrigin string) gin.HandlerFunc {
